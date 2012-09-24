@@ -10,7 +10,7 @@ from urllib import urlencode
 from pprint import pprint
 from time import sleep
 
-USERNAME = 'grenius707'
+USERNAME = 'burgulgoth'
 API_KEY = '4b7393188fa6c24b508de8faf52a460b'
 
 AUDIOSCROBBLER_URL = 'http://ws.audioscrobbler.com/2.0/'
