@@ -26,59 +26,73 @@ def _inflate_from_file(filename):
         return None
 
 
-def get_loved_page(page=1):
-    """Fetch single page of loved tracks"""
-
+def fetch_page(method, page=1, limit=50):
     params = {
-        'method': 'user.getlovedtracks',
         'user': USERNAME,
-        'limit': 50,
+        'limit': limit,
         'page': page,
         'api_key': API_KEY,
         'format': 'json',
     }
+    if method == 'loved':
+        params['method'] = 'user.getlovedtracks'
+    elif method == 'recent':
+        params['method'] = 'user.getrecenttracks'
+    else:
+        return
+
     url = AUDIOSCROBBLER_URL + '?' + urlencode(params)
     try:
-        loved = json.load(urllib2.urlopen(url))
+        page = json.load(urllib2.urlopen(url))
     except Exception:
         raise Exception('Request error occoured')
 
-    if 'error' in loved.keys():
-        raise Exception(loved['message'])
+    if 'error' in page.keys():
+        raise Exception(page['message'])
 
-    return loved['lovedtracks']
+    return page[page.keys()[0]]
 
 
-def get_loved_tracks():
-    """Iterate over total number of pages and return dictionary
-    of artists and tracks. Array of loved tracks belongs to each artist.
-    """
+def get_tracks(method):
+    pages = int(fetch_page(method)['@attr']['totalPages'])
+    tracks_parsed = {}
 
-    pages = int(get_loved_page()['@attr']['totalPages'])
-    loved_parsed = {}
-
-    for pagenum in xrange(1, pages):
-        sys.stdout.write("Parsing page: %d/%d\r" % (pagenum, pages))
+    for pagenum in xrange(1, pages - (pages - 4)):
+        sys.stdout.write("Parsing page: %d/%d\r" % (pagenum, pages - (pages - 4)))
         sys.stdout.flush()
         # fetch page of loved tracks
-        loved = get_loved_page(pagenum)
+        tracks = fetch_page(method, page=pagenum)
 
-        for track in loved['track']:
+        for track in tracks['track']:
             title = track['name']
-            artist = track['artist']['name']
-            if not artist in loved_parsed.keys():
-                loved_parsed[artist] = [title]
-            else:
-                loved_parsed[artist].append(title)
+            if method == 'loved':
+                artist = track['artist']['name']
+                if not artist in tracks_parsed.keys():
+                    tracks_parsed[artist] = [title]
+                else:
+                    tracks_parsed[artist].append(title)
+            if method == 'recent':
+                artist = track['artist']['#text']
+                if not artist in tracks_parsed.keys():
+                    tracks_parsed[artist] = dict()
+                    tracks_parsed[artist][title] = 1
+                else:
+                    if not title in tracks_parsed[artist].keys():
+                        tracks_parsed[artist][title] = 1
+                    else:
+                        tracks_parsed[artist][title] += 1
 
+        sys.stdout.write("Sleeping for %d seconds...\r" % (SLEEP_SEC))
+        sys.stdout.flush()
         sleep(SLEEP_SEC)
 
-    return loved_parsed
+    return tracks_parsed
 
 
 if __name__ == '__main__':
     sys.stdout.write('Starting...\n')
     # retrieve loved tracks from Last.fm service and save locally
-    json.dump(get_loved_tracks(), open('dump.json', 'w'))
+    # json.dump(get_tracks('loved'), open('loved.json', 'w'))
+    json.dump(get_tracks('recent'), open('recent.json', 'w'))
     # retrieve from backup
-    pprint(_inflate_from_file('dump.json'))
+    # pprint(_inflate_from_file('dump.json'))
